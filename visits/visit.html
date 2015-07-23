@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <title></title>
+    <script src='../js/d3/d3.js'></script>
+    <script src='../js/jquery/dist/jquery.js'></script>
+    <style>
+        .empty {
+            stroke: #8b8b8b;
+            stroke-width: 3px;
+            fill: #ffffff;
+        }
+
+        .completed {
+            fill: #2ec864;
+        }
+        .axis path {
+            fill:none;
+            stroke:#000;
+        }
+        .axis .tick {
+            font-family:sans-serif;
+        }
+        svg *{
+            shape-rendering: crispEdges;
+        }
+    </style>
+</head>
+<body>
+<div id="visit"></div>
+<script>
+
+
+    var jsonFiles = ["visit1.json", "visit2.json", "visit3.json", "visit4.json", "visit5.json"];
+    var visitData = [];
+
+    var svgWidth = 1000, svgHeight = 500;
+    var margin = {top: 30, bottom: 50, right: 20, left: 100};
+    var chartWidth = svgWidth - margin.right - margin.left, chartHeight = svgHeight - margin.top - margin.bottom;
+    var circleRadius = 10;
+    var lineWidth = 10;
+    var padding = 5;
+
+    function drawChart() {
+        console.log(visitData);
+        var maxVisits = d3.max(visitData, function (d) {
+            return d.visits.length;
+        }),
+        emptyArray= new Array(maxVisits);
+        console.log(maxVisits);
+        var svg = d3.select('#visit').append('svg').attr({
+            'width': svgWidth,
+            'height': svgHeight
+        });
+        var patients = visitData.map(function (data) {
+            return data.id;
+        });
+        console.log(patients);
+        var patientScale = d3.scale.ordinal().domain(patients).rangeRoundBands([0, chartHeight], .3);
+        var visitScale = d3.scale.linear().domain([0.5, maxVisits]).range([0, chartWidth]);
+        var translateToChart = 'translate(' + margin.left + ',' + margin.top + ')';
+
+        var chart = svg.append('g').attr({
+            width: chartWidth,
+            height: chartHeight,
+            id: 'chart',
+            transform: translateToChart
+
+        });
+        visitData.forEach(function(patientData,patientOrderIndex){
+            console.log(patientData,patientOrderIndex);
+            patientGroup = chart.append('g').attr({
+            id: '.patient_'+patientData.id
+
+
+        });
+            //patientData.visits
+            patientGroup.selectAll('circle').data(emptyArray).enter()
+                .append('circle').attr({
+                    r:circleRadius,
+                    cx:function(d,i){
+                        return visitScale(i+1);
+                    },
+                    cy: function(d,i){
+                        return patientScale(patientData.id);
+                    },
+                    class:function(d,i){
+                        if(i in patientData.visits)
+                        return patientData.visits[i].status;
+                        else return 'empty';
+                    }
+
+                });
+        });
+        var visitAxis = d3.svg.axis().scale(visitScale).orient('top');
+        var patientAxis = d3.svg.axis().scale(patientScale).orient('left');
+        var visitGuide = svg.append('g').attr({
+            'id': 'visitAxis',
+            'class':'axis',
+            'transform': 'translate('+margin.left+',' + (margin.top) + ')'
+        });
+        var patientGuide = svg.append('g').attr({
+            'id': 'patientAxis',
+            'class':'axis',
+            'transform': translateToChart
+            
+        });
+        visitAxis(visitGuide);
+        patientAxis(patientGuide);
+    }
+    function getData() {
+        console.log(jsonFiles);
+        if (jsonFiles.length == 0) {
+            drawChart();
+        } else {
+            d3.json(jsonFiles.pop(), function (error, data) {
+
+                if (error) {
+                    //do nothing
+                } else {
+                    visitData.push(data);
+                    getData();
+                }
+            });
+        }
+    }
+    getData();
+
+
+</script>
+</body>
+</html>

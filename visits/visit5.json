@@ -1,0 +1,36 @@
+{
+  "id":5,
+  "visits":[
+    {
+      "id": 140,
+      "status": "completed",
+      "date": "2011-07-01"
+    },
+    {
+      "id": 141,
+      "status": "completed",
+      "date": "2011-07-03"
+    },
+    {
+      "id": 142,
+      "status": "completed",
+      "date": "2011-07-05"
+    },
+    {
+      "id": 143,
+      "status": "completed",
+      "date": "2011-07-07"
+    },
+    {
+      "id": 144,
+      "status": "completed",
+      "date": "2011-07-11"
+    },
+    {
+      "id": 145,
+      "status": "completed",
+      "date": "2011-07-15"
+    }
+
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "id":1,
+  "visits":[
+    {
+      "id": 100,
+      "status": "completed",
+      "date": "2011-07-01"
+    },
+    {
+      "id": 101,
+      "status": "completed",
+      "date": "2011-07-02"
+    },
+    {
+      "id": 102,
+      "status": "completed",
+      "date": "2011-07-03"
+    },
+    {
+      "id": 103,
+      "status": "completed",
+      "date": "2011-07-04"
+    },
+    {
+      "id": 104,
+      "status": "completed",
+      "date": "2011-07-05"
+    }
+  ]
+}
