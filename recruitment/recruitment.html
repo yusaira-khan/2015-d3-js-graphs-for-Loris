@@ -41,10 +41,12 @@
     var chartWidth = svgWidth - margin.right - margin.left, chartHeight = svgHeight - margin.top - margin.bottom;
     var capThickness = 10;
     var padding = 5;
-    d3.json('recruitment.json', function (error, data) {
+var cohortArray,maleArray,femaleArray, targetArray, unreachedArray;
+    d3.json('default_all.json', function (error, data) {
 
         if (error) {
-            console.log(error);
+            console.error(error);
+            return;
         } else {
             console.log(data);
         }

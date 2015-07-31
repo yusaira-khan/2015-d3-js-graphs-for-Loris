@@ -3,8 +3,8 @@
 <head lang='en'>
     <meta charset='UTF-8'>
     <title></title>
-    <script src='node_modules/d3/d3.js'></script>
-    <script src='node_modules/jquery/dist/jquery.js'></script>
+    <script src='../js/d3/d3.js'></script>
+    <script src='../js/jquery/dist/jquery.js'></script>
     <style>
         .male {
             fill: #00b3ee;
@@ -21,14 +21,17 @@
         .unreached {
             fill: #e2e2e2;
         }
+
         .axis path {
-            fill:none;
-            stroke:#000;
+            fill: none;
+            stroke: #000;
         }
+
         .axis .tick {
-            font-family:sans-serif;
+            font-family: sans-serif;
         }
-        svg *{
+
+        svg * {
             shape-rendering: crispEdges;
         }
     </style>
@@ -41,166 +44,120 @@
     var chartWidth = svgWidth - margin.right - margin.left, chartHeight = svgHeight - margin.top - margin.bottom;
     var capThickness = 10;
     var padding = 5;
-    var dataset = [];
-    d3.json('recruitment.json', function (error, data) {
+    var cohortArray, targetArray, layers;
+    var stack, stackMax, barTypes, caps;
 
-        if (error) {
-            console.log(error);
-        } else {
-            console.log(data);
-        }
-        var cohortArray = [];
-        var maleArray = [];
-        var femaleArray = [];
-        var targetArray = [];
-        var unreachedArray = [];
-        data.stats.forEach(function (group) {
+    function getData(allData){
+        var dataset = [[], [], []];
+        allData.forEach(function (group, index) {
 
-
-            cohortArray.push(group.cohort);
-            targetArray.push(group.target);
-
+            var unreached;
             group.total = group.male + group.female;
-            unreached = group.target - group.total;
-            if (unreached<0){
+            if (!group.target) {
                 unreached = 0;
+            } else {
+                unreached = group.target - group.total;
             }
-            dataset.push([
-                {
-                    x: group.cohort,
-                    y: group.male
-                },
-                {
-                    x: group.cohort,
-                    y: group.female
-                },
-                {
-                    x: group.cohort,
-                    y: group.unreached
-                }
-            ]);
-
+            if (unreached < 0)  unreached = 0;
+            dataset[0].push({x: group.cohort, y: group.male});
+            dataset[1].push({x: group.cohort, y: group.female});
+            dataset[2].push({x: group.cohort, y: unreached});
 
         });
+        return d3.layout.stack()(dataset);
+    }
 
+    function drawChart(chart,numberScale,cohortScale,classScale){
+        barTypes = chart.selectAll('.types').data(stack).enter()
+                .append('g').attr('class', function (d, i) {
+                    console.log(d, i, classScale(i));
+                    return classScale(i);
+                });
+        barTypes.selectAll('rect').data(function (d) {
+            return d;
+        }).enter().append('rect').attr({
+            y: function (d) {
+                return cohortScale(d.x);
+            },
+            x: function (d, i) {
+                console.log(i, d.x, cohortArray[d.x], d.y0, d.y);
+                return numberScale(d.y0);
+            },
+            height: cohortScale.rangeBand(),
+            width: function (d) {
+                return numberScale(d.y)
+            }
+        });
 
+        caps = chart.selectAll('.cap').data(targetArray).enter()
+                .append('rect').attr({
+                    height: cohortScale.rangeBand(),
+                    width: function (d) {
+                        return d3.min([numberScale(d), capThickness]);
+                    },
+                    y: function (d, i) {
+                        return cohortScale(cohortArray[i]);
+                    },
+                    x: function (d) {
+                        return d3.max([numberScale(d) - capThickness, 0]);
+                    },
+                    class: 'cap'
+                });
+
+    }
+    function newChart (error, data) {
+
+        cohortArray = data.stats.map(function (g) {
+            return g.cohort
+        });
+        targetArray = data.stats.map(function (g) {
+            return g.target
+        });
+        stack = getData(data.stats);
         var svg = d3.select('#recruitment').append('svg').attr({
             'width': svgWidth,
             'height': svgHeight
         });
 
-        function getMaxData() {
-            var max = 0;
-            data.stats.forEach(function (group) {
-                var currentMax;
-                if (group.total > group.target) currentMax = group.total;
-                else currentMax = group.target;
-                if (currentMax > max) max = currentMax;
-            });
-            return max;
-        }
-
-        var numberScale = d3.scale.linear().domain([0, getMaxData()]).range([0, chartWidth]);
-        var cohortScale = d3.scale.ordinal().domain(cohortArray).rangeRoundBands([0, chartHeight],.3);
-        var translateToChart = 'translate('+margin.left+','+margin.top+')';
-        console.log(dataset);
-
-        var stack=d3.layout.stack(dataset);
-        console.log(dataset);
-        dataset.map(function (group) {
-            return group.map(function (d) {
-                // Invert the x and y values, and y0 becomes x0
-                return {
-                    x: d.y,
-                    y: d.x,
-                    x0: d.y0
-                };
+        stackMax = d3.max(stack, function (layer) {
+            return d3.max(layer, function (d) {
+                return d.y0 + d.y;
             });
         });
 
-        var chart= svg.append('g').attr({
-            width :chartWidth,
-            height : chartHeight,
+        var numberScale = d3.scale.linear().domain([0, stackMax]).range([0, chartWidth]);
+        var cohortScale = d3.scale.ordinal().domain(cohortArray).rangeRoundBands([0, chartHeight], .3);
+        var classScale = d3.scale.ordinal().domain(d3.range(3)).range(['male bar', 'female bar', 'unreached bar']);
+        var translateToChart = 'translate(' + margin.left + ',' + margin.top + ')';
+
+        var chart = svg.append('g').attr({
+            width: chartWidth,
+            height: chartHeight,
             id: 'chart',
             transform: translateToChart
 
         });
-        var maleBars = chart.selectAll('.male').data(maleArray).enter()
-                .append('rect').attr({
-                    height:cohortScale.rangeBand(),
-                    width:function(d){
-                        return numberScale(d);
-                    },
-                    y: function(d,i){
-                        return cohortScale(cohortArray[i]);
-                    },
-                    class:'male bar'
-                });
-        var femaleBars = chart.selectAll('.female').data(femaleArray).enter()
-                .append('rect').attr({
-                    height:cohortScale.rangeBand(),
-                    width:function(d){
-                        return numberScale(d);
-                    },
-                    y: function(d,i){
-                        return cohortScale(cohortArray[i]);
-                    },
-                    x: function(d,i){
-                        return numberScale(maleArray[i]);
-                    },
-                    class:'female bar'
-                });
-
-        var unreachedBars = chart.selectAll('.unreached').data(unreachedArray).enter()
-                .append('rect').attr({
-                    height:cohortScale.rangeBand(),
-                    width:function(d){
-                        return numberScale(d);
-                    },
-                    y: function(d,i){
-                        return cohortScale(cohortArray[i]);
-                    },
-                    x: function(d,i){
-                        return numberScale(maleArray[i]+femaleArray[i]);
-                    },
-                    class:'unreached bar'
-                });
-
-        var caps = chart.selectAll('.cap').data(targetArray).enter()
-                .append('rect').attr({
-                    height:cohortScale.rangeBand(),
-                    width: function(d){
-                      return d3.min([numberScale(d),capThickness]);
-                    },
-                    y: function(d,i){
-                        return cohortScale(cohortArray[i]);
-                    },
-                    x: function(d){
-                        return d3.max([numberScale(d) - capThickness,0]);
-                    },
-                    class:'cap'
-                });
-
+        drawChart(chart,numberScale,cohortScale,classScale);
         var numberAxis = d3.svg.axis().scale(numberScale).orient('bottom').ticks(20);
-        var cohortAxis = d3.svg.axis().scale(cohortScale).orient('left');
+        var cohortAxis = d3.svg.axis().scale(cohortScale).orient('left');//.tickValues(cohortArray);
         var numberGuide = svg.append('g').attr({
             'id': 'numberAxis',
-            'class':'axis',
-            'transform': 'translate('+margin.left+',' + (svgHeight - margin.bottom) + ')'
+            'class': 'axis',
+            'transform': 'translate(' + margin.left + ',' + (svgHeight - margin.bottom) + ')'
         });
         var cohortGuide = svg.append('g').attr({
             'id': 'cohortAxis',
-            'class':'axis',
+            'class': 'axis',
             'transform': translateToChart
         });
         numberAxis(numberGuide);
         cohortAxis(cohortGuide);
-/*
-* TODO: use stacks
-* TODO: displaying stats on mouseover
-* */
+        /*
+         * TODO: displaying stats on mouseover
+         * */
+    }
 
-    });
+    var json = d3.json('default_all.json', newChart);
 </script>
 
 </body>

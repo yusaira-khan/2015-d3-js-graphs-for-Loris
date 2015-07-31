@@ -1,0 +1,40 @@
+{
+  "stats": [
+    {
+      "cohort": "SCI",
+      "target": 180,
+      "male": 60,
+      "female": 60
+    },
+    {
+      "cohort": "MCI",
+      "target": 300,
+      "male": 30,
+      "female": 150
+    },
+    {
+      "cohort": "V-MCI",
+      "target": 200,
+      "male": 100,
+      "female": 50
+    },
+    {
+      "cohort": "AD",
+      "target": 260,
+      "male": 80,
+      "female": 80
+    },
+    {
+      "cohort": "LBD",
+      "target": 200,
+      "male": 150,
+      "female": 80
+    },
+    {
+      "cohort": "FTD",
+      "target": 100,
+      "male": 50,
+      "female": 30
+    }
+  ]
+}
