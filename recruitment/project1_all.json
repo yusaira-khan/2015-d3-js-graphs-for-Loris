@@ -1,18 +1,6 @@
 {
   "stats": [
     {
-      "cohort": "SCI",
-      "target": 180,
-      "male": 60,
-      "female": 60
-    },
-    {
-      "cohort": "MCI",
-      "target": 300,
-      "male": 30,
-      "female": 150
-    },
-    {
       "cohort": "V-MCI",
       "target": 200,
       "male": 100,
@@ -35,6 +23,12 @@
       "target": 100,
       "male": 50,
       "female": 30
+    }
+  ],
+  "sites":[
+    {
+      "name" : "Site 1",
+      "file" : "default_site1.json"
     }
   ]
 }
