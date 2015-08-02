@@ -27,7 +27,7 @@
   ],
   "sites":[
     {
-      "name" : "Site 1",
+      "name" : "PSite 1",
       "file" : "default_site1.json"
     }
   ]

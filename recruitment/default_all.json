@@ -36,5 +36,11 @@
       "male": 50,
       "female": 30
     }
+  ],
+  "sites":[
+    {
+      "name" : "Site 1",
+      "file" : "default_site1.json"
+    }
   ]
 }
