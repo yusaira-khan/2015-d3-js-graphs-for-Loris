@@ -7,19 +7,19 @@
     <script src='../js/jquery/dist/jquery.js'></script>
     <style>
         .male {
-            fill: #00b3ee;
+            fill: #2fa4e7;
         }
 
         .female {
-            fill: #008bbd;
+            fill: #1c70b6;
         }
 
         .target {
-            fill: #36d46d;
+            fill: #18c25c;
         }
 
         .unreached {
-            fill: #e2e2e2;
+            fill: #f5f5f5;
         }
 
         .axis path {
@@ -35,8 +35,230 @@
             shape-rendering: crispEdges;
         }
     </style>
+    <script>
+
+        //CONSTANTS
+        var svgWidth = 1000, svgHeight = 500;
+        var margin = {top: 30, bottom: 50, right: 20, left: 100};
+        var capThickness = 10, padding = 5;
+        var transitionDuration = 300;
+        //GLOBALS
+        var cohortArray, targetArray, stack, barClasses, targets;
+        var numberScale, cohortScale, classScale, chart;
+        var projectFilter , siteFilter ;
+
+        function setFilters() {
+            projectFilter = document.getElementById('project-filter');
+            siteFilter = document.getElementById('site-filter');
+        }
+
+
+        function setNewProject(error, data) {
+            if (error) {
+                alert(error);
+                throw error;
+            }
+            addSites(data.sites);
+            drawChartForNewProject(data.stats)
+
+        }
+
+        function addSites(sites) {
+            var options = '';
+
+            //The first option is 'All' and it links to the json of the selected project
+            var first_option = '<option value="' + getCurrentProject().value + '" selected>All</option>';
+            options += first_option;
+
+            //Building the html tag of each site option. The the file is the link to retrieve the json
+            for (var i = 0; i < sites.length; i++) {
+                options += '<option value="' + sites[i].file + '">' + sites[i].name + '</option>';
+            }
+
+            siteFilter.innerHTML = options;
+            siteFilter.selectedIndex = 0;
+        }
+
+        //Get the selected project from the project filter
+        function getCurrentProject() {
+            var index = projectFilter.selectedIndex;
+            return projectFilter[index];
+        }
+
+        //Use the stats information to draw a new chart
+        function drawChartForNewProject(stats) {
+            //Get the cohorts used in teh project
+            cohortArray = stats.map(function (g) {
+                return g.cohort
+            });
+            //Get the project targets for each cohort
+            targetArray = stats.map(function (g) {
+                return g.target
+            });
+            stack = getStackedBarData(stats);
+
+            var stackMax = d3.max(stack, function (layer) {
+                return d3.max(layer, function (d) {
+                    return d.y0 + d.y;
+                });
+            });
+            //Draw chart and axes
+            setChartInfoAndBackground(stackMax);
+            createBarClasses();
+            drawChart();
+            drawTargets();
+        }
+
+        //Takes the data as an an array of objects and turns it into a d3 stack
+        function getStackedBarData(allData) {
+            var dataset = [[], [], []];
+            cohortArray.forEach(function (cohort, i) {
+                //Find the information about a cohort
+                var group = findCohort(cohort, allData, i);
+                var unreached;
+                group.total = group.male + group.female;
+                if (!group.target) {
+                    unreached = 0;
+                } else {
+                    unreached = group.target - group.total;
+                }
+                if (unreached < 0)  unreached = 0;
+                dataset[0].push({x: cohort, y: group.male});
+                dataset[1].push({x: cohort, y: group.female});
+                dataset[2].push({x: cohort, y: unreached});
+
+            });
+            return d3.layout.stack()(dataset);
+        }
+
+        function findCohort(cohort, groups, i) {
+            var len = groups.length;
+            if (i < len && cohort == groups[i].cohort) {
+                return groups[i];
+            }
+            for (var index = 0; index < len; index++) {
+                if (i === index) {
+                    continue;
+                }
+                if (cohort == groups[index].cohort) {
+
+                    return groups[index];
+                }
+            }
+            return {male: 0, female: 0};
+        }
+
+        function setChartInfoAndBackground(max) {
+
+            var svg = d3.select('#recruitment').append('svg').attr({
+                'width': svgWidth,
+                'height': svgHeight
+            });
+
+            var chartWidth = svgWidth - margin.right - margin.left, chartHeight = svgHeight - margin.top - margin.bottom;
+            numberScale = d3.scale.linear().domain([0, max]).range([0, chartWidth]);
+            cohortScale = d3.scale.ordinal().domain(cohortArray).rangeRoundBands([0, chartHeight], .3);
+            classScale = d3.scale.ordinal().domain(d3.range(3)).range(['male cohort', 'female cohort', 'unreached cohort']);
+
+            chart = svg.append('g').attr({
+                width: chartWidth,
+                height: chartHeight,
+                id: 'chart',
+                transform: 'translate(' + margin.left + ',' + margin.top + ')'
+
+            });
+
+            var numberAxis = d3.svg.axis().scale(numberScale).orient('bottom').ticks(20);
+            var cohortAxis = d3.svg.axis().scale(cohortScale).orient('left');//.tickValues(cohortArray);
+
+            var numberGuide = svg.append('g').attr({
+                id: 'numberAxis',
+                class: 'axis',
+                transform: 'translate(' + margin.left + ',' + (svgHeight - margin.bottom) + ')'
+            });
+
+            var cohortGuide = svg.append('g').attr({
+                id: 'cohortAxis',
+                class: 'axis',
+                transform: chart.attr('transform')
+            });
+
+            numberAxis(numberGuide);
+            cohortAxis(cohortGuide);
+        }
+
+        function createBarClasses() {
+            barClasses = chart.selectAll('.cohort').data(stack).enter()
+                    .append('g').attr('class', function (d, i) {
+                        return classScale(i);
+                    });
+            barClasses.selectAll('rect').data(function (d) {
+                return d;
+            }).enter().append('rect');
+        }
+
+        function drawChart() {
+            barClasses.selectAll('rect').data(function (d) {
+                return d;
+            }).transition().duration(transitionDuration).attr({
+                y: function (d) {
+                    return cohortScale(d.x);
+                },
+                x: function (d, i) {
+                    return numberScale(d.y0);
+                },
+                height: cohortScale.rangeBand(),
+                width: function (d) {
+                    return numberScale(d.y)
+                }
+            })
+        }
+
+        function drawTargets() {
+
+            targets = chart.selectAll('.target').data(targetArray).enter()
+                    .append('rect').attr({
+                        height: cohortScale.rangeBand(),
+                        width: function (d) {
+                            return d3.min([numberScale(d), capThickness]);
+                        },
+                        y: function (d, i) {
+                            return cohortScale(cohortArray[i]);
+                        },
+                        x: function (d) {
+                            return d3.max([numberScale(d) - capThickness, 0]);
+                        },
+                        class: 'target'
+                    })
+        }
+
+        function changeSite() {
+            var index = siteFilter.selectedIndex;
+            var selectedFile = siteFilter[index].value;
+            var selectedOptionName = siteFilter[index].text;
+            d3.json(selectedFile, function (error, data) {
+                stack = getStackedBarData(data.stats);
+                barClasses = chart.selectAll('.cohort').data(stack);
+                drawChart();
+                if (selectedOptionName == 'All') {
+                    drawTargets();
+                } else {
+                    targets.remove();
+                }
+            })
+        }
+
+        function changeProject() {
+            var selectedFile = getCurrentProject().value;
+            d3.select('svg').transition().duration(transitionDuration).attr('height', 0).remove();
+            d3.json(selectedFile, setNewProject);
+        }
+
+
+    </script>
+
 </head>
-<body>
+<body onload="setFilters();d3.json('default_all.json', setNewProject)">
 <div id='recruitment'></div>
 <div class="filters"><label for="site-filter">Site:</label><select id="site-filter" onchange="changeSite()">
 </select>
@@ -46,215 +268,6 @@
         <option value="project1_all.json">Project 1</option>
     </select>
 </div>
-
-<script>
-    //CONSTANTS
-    var svgWidth = 1000, svgHeight = 500;
-    var margin = {top: 30, bottom: 50, right: 20, left: 100};
-    var capThickness = 10, padding = 5;
-    var transitionDuration = 300;
-    //GLOBALS
-    var cohortArray, targetArray, stack, barClasses, targets;
-    var numberScale, cohortScale, classScale, chart;
-    var projectFilter = document.getElementById('project-filter'), siteFilter = document.getElementById('site-filter');
-
-    function findGroup(cohort, groups, i) {
-        var len = groups.length;
-        if (i < len && cohort == groups[i].cohort) {
-            return groups[i];
-        }
-        for (var index = 0; index < len; index++) {
-            if (i === index) {
-                continue;
-            }
-            if (cohort == groups[index].cohort) {
-
-                return groups[index];
-            }
-        }
-        return {male: 0, female: 0};
-    }
-
-    function getData(allData) {
-        var dataset = [[], [], []];
-        cohortArray.forEach(function (cohort, i) {
-            var group = findGroup(cohort, allData, i);
-            var unreached;
-            group.total = group.male + group.female;
-            if (!group.target) {
-                unreached = 0;
-            } else {
-                unreached = group.target - group.total;
-            }
-            if (unreached < 0)  unreached = 0;
-            dataset[0].push({x: cohort, y: group.male});
-            dataset[1].push({x: cohort, y: group.female});
-            dataset[2].push({x: cohort, y: unreached});
-
-        });
-        return d3.layout.stack()(dataset);
-    }
-
-    function createBarClasses() {
-        barClasses = chart.selectAll('.cohort').data(stack).enter()
-                .append('g').attr('class', function (d, i) {
-                    return classScale(i);
-                });
-        barClasses.selectAll('rect').data(function (d) {
-            return d;
-        }).enter().append('rect');
-    }
-
-    function drawChart() {
-        barClasses.selectAll('rect').data(function (d) {
-            return d;
-        }).transition().duration(transitionDuration).attr({
-            y: function (d) {
-                return cohortScale(d.x);
-            },
-            x: function (d, i) {
-                return numberScale(d.y0);
-            },
-            height: cohortScale.rangeBand(),
-            width: function (d) {
-                return numberScale(d.y)
-            }
-        })
-    }
-
-    function drawTargets() {
-
-        targets = chart.selectAll('.target').data(targetArray).enter()
-                .append('rect').attr({
-                    height: cohortScale.rangeBand(),
-                    width: function (d) {
-                        return d3.min([numberScale(d), capThickness]);
-                    },
-                    y: function (d, i) {
-                        return cohortScale(cohortArray[i]);
-                    },
-                    x: function (d) {
-                        return d3.max([numberScale(d) - capThickness, 0]);
-                    },
-                    class: 'target'
-                })
-    }
-
-    function setChartInfoAndBackground(max) {
-
-        var svg = d3.select('#recruitment').append('svg').attr({
-            'width': svgWidth,
-            'height': svgHeight
-        });
-
-        var chartWidth = svgWidth - margin.right - margin.left, chartHeight = svgHeight - margin.top - margin.bottom;
-        numberScale = d3.scale.linear().domain([0, max]).range([0, chartWidth]);
-        cohortScale = d3.scale.ordinal().domain(cohortArray).rangeRoundBands([0, chartHeight], .3);
-        classScale = d3.scale.ordinal().domain(d3.range(3)).range(['male cohort', 'female cohort', 'unreached cohort']);
-
-        chart = svg.append('g').attr({
-            width: chartWidth,
-            height: chartHeight,
-            id: 'chart',
-            transform: 'translate(' + margin.left + ',' + margin.top + ')'
-
-        });
-
-        var numberAxis = d3.svg.axis().scale(numberScale).orient('bottom').ticks(20);
-        var cohortAxis = d3.svg.axis().scale(cohortScale).orient('left');//.tickValues(cohortArray);
-
-        var numberGuide = svg.append('g').attr({
-            id: 'numberAxis',
-            class: 'axis',
-            transform: 'translate(' + margin.left + ',' + (svgHeight - margin.bottom) + ')'
-        });
-
-        var cohortGuide = svg.append('g').attr({
-            id: 'cohortAxis',
-            class: 'axis',
-            transform: chart.attr('transform')
-        });
-
-        numberAxis(numberGuide);
-        cohortAxis(cohortGuide);
-    }
-
-    function newChart(stats) {
-        cohortArray = stats.map(function (g) {
-            return g.cohort
-        });
-        targetArray = stats.map(function (g) {
-            return g.target
-        });
-        stack = getData(stats);
-
-        var stackMax = d3.max(stack, function (layer) {
-            return d3.max(layer, function (d) {
-                return d.y0 + d.y;
-            });
-        });
-        setChartInfoAndBackground(stackMax);
-        createBarClasses();
-        drawChart();
-        drawTargets();
-
-        /*
-         * TODO: displaying stats on mouseover
-         * */
-    }
-
-    function getCurrentProject() {
-
-        var index = projectFilter.selectedIndex;
-        return projectFilter[index];
-    }
-
-    function addSites(sites) {
-        var options = '';
-        var first_option = '<option value="' + getCurrentProject().value + '" selected>All</option>';
-        options += first_option;
-
-        for (var i = 0; i < sites.length; i++) {
-            options += '<option value="' + sites[i].file + '">' + sites[i].name + '</option>';
-        }
-        siteFilter.innerHTML = options;
-        siteFilter.selectedIndex = 0;
-    }
-
-    function changeSite() {
-        var index = siteFilter.selectedIndex;
-        var selectedFile = siteFilter[index].value;
-        var selectedOptionName = siteFilter[index].text;
-        d3.json(selectedFile, function (error, data) {
-            stack = getData(data.stats);
-            barClasses = chart.selectAll('.cohort').data(stack);
-            drawChart();
-            if (selectedOptionName == 'All') {
-                drawTargets();
-            } else {
-                targets.remove();
-            }
-        })
-    }
-
-    function changeProject() {
-        var selectedFile = getCurrentProject().value;
-        d3.select('svg').transition().duration(transitionDuration).attr('height', 0).remove();
-        d3.json(selectedFile, setNewProject);
-    }
-
-    function setNewProject(error, data) {
-        if (error) {
-            alert(error);
-            throw error;
-        }
-        addSites(data.sites);
-        newChart(data.stats)
-
-    }
-
-    var json = d3.json('default_all.json', setNewProject);
-</script>
 
 
 </body>
